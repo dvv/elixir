@@ -126,13 +126,14 @@ defmodule ExUnit.Runner do
 
   defp run_test(config, pid, test_case, test_name, context) do
     ExUnit.TestCase[name: case_name] = test_case
-
     test = ExUnit.Test[name: test_name, case: case_name]
-    config.formatter.test_started(config.formatter_id, test)
+
 
     # Run test in a new process so that we can trap exits for a single test
     self_pid = self
     { test_pid, test_ref } = Process.spawn_monitor fn ->
+      config.formatter.test_started(config.formatter_id, test)
+
       test = try do
         context = case_name.__exunit__(:setup, Keyword.put(context, :test, test))
 

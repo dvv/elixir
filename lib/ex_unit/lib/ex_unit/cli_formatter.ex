@@ -24,16 +24,16 @@ defmodule ExUnit.CLIFormatter do
     :gen_server.call(id, { :suite_finished, run_us, load_us }, @timeout)
   end
 
-  def case_started(_id, _test_case) do
-    :ok
+  def case_started(id, test_case) do
+    :gen_server.cast(id, { :case_started, test_case })
   end
 
   def case_finished(id, test_case) do
     :gen_server.cast(id, { :case_finished, test_case })
   end
 
-  def test_started(_id, _test) do
-    :ok
+  def test_started(id, test) do
+    :gen_server.cast(id, { :test_started, test })
   end
 
   def test_finished(id, test) do
@@ -55,24 +55,35 @@ defmodule ExUnit.CLIFormatter do
     super(reqest, from, config)
   end
 
-  def handle_cast({ :test_finished, ExUnit.Test[failure: nil] }, config) do
-    IO.write success(".")
+  def handle_cast({ :test_started, ExUnit.Test[name: name] }, config) do
+    IO.write "    * #{name} "
+    { :noreply, config }
+  end
+
+  def handle_cast({ :test_finished, ExUnit.Test[failure: nil] = test }, config) do
+    IO.write success "\r    * #{test.name} \n"
     { :noreply, config.update_tests_counter(&1 + 1) }
   end
 
-  def handle_cast({ :test_finished, ExUnit.Test[failure: { :invalid, _ }] }, config) do
-    IO.write invalid("?")
+  def handle_cast({ :test_finished, ExUnit.Test[failure: { :invalid, _ }] = test }, config) do
+    IO.write invalid "\r    * #{test.name} \n"
     { :noreply, config.update_tests_counter(&1 + 1).
         update_invalid_counter(&1 + 1) }
   end
 
   def handle_cast({ :test_finished, test }, config) do
-    IO.write failure("F")
+    IO.write failure "\r    * #{test.name} \n"
     { :noreply, config.update_tests_counter(&1 + 1).
         update_test_failures([test|&1]) }
   end
 
+  def handle_cast({ :case_started, ExUnit.TestCase[name: name] }, config) do
+    IO.write "  #{name}\n"
+    { :noreply, config }
+  end
+
   def handle_cast({ :case_finished, test_case }, config) do
+    IO.write "\n"
     if test_case.failure do
       { :noreply, config.update_case_failures([test_case|&1]) }
     else
